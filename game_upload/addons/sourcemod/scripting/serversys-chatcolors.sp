@@ -34,6 +34,27 @@ public void OnPluginStart(){
 	if(IsSource2009()){
 		g_iColorCount = 173;
 	}
+
+	LoadConfig();
+}
+
+void LoadConfig(){
+	Handle kv = CreateKeyValues("Chat-Colors");
+	char Config_Path[PLATFORM_MAX_PATH];
+	BuildPath(Path_SM, Config_Path, sizeof(Config_Path), "configs/serversys/chatcolors.cfg");
+
+	if(!(FileExists(Config_Path)) || !(FileToKeyValues(kv, Config_Path))){
+		Sys_KillHandle(kv);
+		SetFailState("[serversys] chat-colors :: Cannot read from configuration file: %s", Config_Path);
+	}
+
+	g_bEnablePlugin = view_as<bool>(KvGetNum(kv, "enabled", 1));
+
+	KvGetString(kv, "command_colors", g_cCommand_Colors, sizeof(g_cCommand_Colors), "!colors /colors");
+	KvGetString(kv, "command_settag", g_cCommand_SetTag, sizeof(g_cCommand_SetTag), "!ctag /ctag");
+	KvGetString(kv, "command_setmsg", g_cCommand_SetMsg, sizeof(g_cCommand_SetMsg), "!cmsg /cmsg");
+
+	Sys_KillHandle(kv);
 }
 
 public void OnAllPluginsLoaded(){
