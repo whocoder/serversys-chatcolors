@@ -153,7 +153,7 @@ public void Frame_Colors(DataPack pack){
 
 		int i = pos;
 		char buffer[32];
-		for(; ((i < g_iColorCount) && (i < pos + 4)); i++){
+		for(; ((i < g_iColorCount) && (i < (pos + 4))); i++){
 			strcopy(buffer, sizeof(buffer), (IsSource2009() ? c_Source2009[i] : c_Source2013[i]));
 			CFormatColor(buffer, sizeof(buffer), client);
 
