@@ -110,19 +110,6 @@ public void Colors_Loaded(Handle owner, Handle hndl, const char[] error, any use
 	}
 }
 
-void UpdateColors(int client){
-	if((0 < client <= MaxClients) && IsClientInGame(client) && g_bDatabaseReady){
-		int pid = Sys_GetPlayerID(client);
-
-		if(pid > -1){
-			char query[1024];
-			Format(query, sizeof(query), "UPDATE chatcolors SET tag='%s', msg='%s' WHERE pid=%d AND game=%d;", g_cCustomTag[client], g_cCustomMsg[client], pid, view_as<int>(GetEngineVersion()));
-
-			Sys_DB_TQuery(Generic_Callback, query);
-		}
-	}
-}
-
 public void Generic_Callback(Handle owner, Handle hndl, const char[] error, any userid){
 	if(hndl == INVALID_HANDLE){
 		LogError("[serversys] chat-colors :: Generic SQL callback error: %s", error);
@@ -196,9 +183,14 @@ public void Command_SetMsg(int client, const char[] command, const char[] args){
 
 	if(found){
 		strcopy(g_cCustomMsg[client], MAX_COLOR_LENGTH, args);
-		CPrintToChat(client, "%t", "Chat settings updated");
 
-		UpdateColors(client);
+		if(Sys_GetPlayerID(client) > -1){
+			char query[1024];
+			Format(query, sizeof(query), "UPDATE chatcolors SET msg='%s' WHERE pid=%d AND game=%d;", g_cCustomMsg[client], Sys_GetPlayerID(client), view_as<int>(GetEngineVersion()));
+
+			Sys_DB_TQuery(Generic_Callback, query);
+			CPrintToChat(client, "%t", "Chat settings updated");
+		}
 	}else
 		CPrintToChat(client, "%t", "Invalid color specified");
 
@@ -219,8 +211,13 @@ public void Command_SetTag(int client, const char[] command, const char[] args){
 	}
 
 	strcopy(g_cCustomTag[client], MAX_TAG_LENGTH, args);
-	CPrintToChat(client, "%t", "Chat settings updated");
-	UpdateColors(client);
+	if(Sys_GetPlayerID(client) > -1){
+		char query[1024];
+		Format(query, sizeof(query), "UPDATE chatcolors SET tag='%s' WHERE pid=%d AND game=%d;", g_cCustomTag[client], Sys_GetPlayerID(client), view_as<int>(GetEngineVersion()));
+
+		Sys_DB_TQuery(Generic_Callback, query);
+		CPrintToChat(client, "%t", "Chat settings updated");
+	}
 
 	return;
 }
