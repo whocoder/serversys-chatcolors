@@ -12,11 +12,12 @@ CREATE TABLE IF NOT EXISTS `chatcolors` (
   `pid` int(11) NOT NULL,
   `game` int(11) NOT NULL,
   `msg` varchar(64) NOT NULL,
-  `tag` varchar(128) DEFAULT NULL
+  `tag` varchar(128) NOT NULL
 ) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4;
 
 ALTER TABLE `chatcolors`
   ADD PRIMARY KEY (`rownum`),
+  ADD UNIQUE KEY `pid_game` (`pid`, `game`),
   ADD KEY `pid` (`pid`),
   ADD KEY `game` (`game`),
   ADD KEY `msg` (`msg`),

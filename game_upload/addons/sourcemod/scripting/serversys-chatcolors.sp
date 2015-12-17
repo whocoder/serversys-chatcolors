@@ -4,9 +4,6 @@
 #pragma semicolon 1
 #pragma newdecls required
 
-char q_SelectColors[] = "SELECT tag, msg FROM chatcolors WHERE pid=%d AND game=%d;";
-char q_UpdateColors[] = "INSERT INTO chatcolors(pid, game) VALUES(%d, %d) ON DUPLICATE KEY UPDATE tag='%s', msg='%s';";
-
 public Plugin myinfo = {
 	name = "[Server-Sys] Chat Colors",
 	description = "Server-Sys chat colors and tag handler.",
@@ -74,9 +71,25 @@ public void OnAllPluginsLoaded(){
 public void OnPlayerIDLoaded(int client, int playerid){
 	if(g_bEnablePlugin && (playerid > -1) && (0 < client <= MaxClients)){
 		char query[1024];
-		Format(query, sizeof(query), "%s", q_SelectColors, playerid, view_as<int>(GetEngineVersion()));
+		Format(query, sizeof(query), "INSERT IGNORE INTO chatcolors(pid, game) VALUES(%d, %d);", playerid, view_as<int>(GetEngineVersion()));
 
-		Sys_DB_TQuery(Colors_Loaded, query, GetClientUserId(client));
+		Sys_DB_TQuery(Colors_Insert, query, GetClientUserId(client));
+	}
+}
+
+public void Colors_Insert(Handle owner, Handle hndl, const char[] error, any userid){
+	if(hndl == INVALID_HANDLE){
+		LogError("[serversys] chat-colors :: Error inserting users chat-colors: %s", error);
+		return;
+	}
+
+	int client = GetClientOfUserId(userid);
+
+	if((0 < client <= MaxClients)){
+		char query[1024];
+		Format(query, sizeof(query), "SELECT tag, msg FROM chatcolors WHERE pid='%d' AND game='%d';", Sys_GetPlayerID(client), view_as<int>(GetEngineVersion()));
+
+		Sys_DB_TQuery(Colors_Loaded, query, userid);
 	}
 }
 
@@ -92,6 +105,7 @@ public void Colors_Loaded(Handle owner, Handle hndl, const char[] error, any use
 		SQL_FetchString(hndl, 0, g_cCustomTag[client], MAX_TAG_LENGTH);
 		SQL_FetchString(hndl, 1, g_cCustomMsg[client], MAX_COLOR_LENGTH);
 	}
+	PrintToConsole(client, "Loaded your chat colors/tag successfully.");
 }
 
 void UpdateColors(int client){
@@ -100,7 +114,7 @@ void UpdateColors(int client){
 
 		if(pid > -1){
 			char query[1024];
-			Format(query, sizeof(query), "%s", q_UpdateColors, pid, view_as<int>(GetEngineVersion()), g_cCustomTag[client], g_cCustomMsg[client]);
+			Format(query, sizeof(query), "UPDATE chatcolors SET tag='%s', msg='%s' WHERE pid=%d AND game=%d;", g_cCustomTag[client], g_cCustomMsg[client], pid, view_as<int>(GetEngineVersion()));
 
 			Sys_DB_TQuery(Generic_Callback, query);
 		}
@@ -121,15 +135,39 @@ public void Command_Colors(int client, const char[] command, const char[] args){
 	if(!(0 < client <= MaxClients))
 		return;
 
-	char buffer[32];
-	for(int i = 0; i < g_iColorCount; i++){
-		strcopy(buffer, sizeof(buffer), (IsSource2009() ? c_Source2009[i] : c_Source2013[i]));
-		CFormatColor(buffer, sizeof(buffer), client);
-
-		PrintToChat(client, " > %s%s", buffer, (IsSource2009() ? c_Source2009[i] : c_Source2013[i]));
-	}
+	DataPack pack = new DataPack();
+	pack.WriteCell(GetClientUserId(client));
+	pack.WriteCell(0);
+	RequestFrame(Frame_Colors, pack);
 
 	return;
+}
+
+public void Frame_Colors(DataPack pack){
+	pack.Reset();
+	int client = GetClientOfUserId(pack.ReadCell());
+
+	if((0 < client <= MaxClients) && IsClientInGame(client)){
+		int pos = pack.ReadCell();
+		CloseHandle(pack);
+
+		int i = pos;
+		char buffer[32];
+		for(; ((i < g_iColorCount) && (i < pos + 4)); i++){
+			strcopy(buffer, sizeof(buffer), (IsSource2009() ? c_Source2009[i] : c_Source2013[i]));
+			CFormatColor(buffer, sizeof(buffer), client);
+
+			PrintToChat(client, " > %s%s", buffer, (IsSource2009() ? c_Source2009[i] : c_Source2013[i]));
+		}
+
+		if(i < g_iColorCount){
+			DataPack newpack = new DataPack();
+			newpack.WriteCell(GetClientUserId(client));
+			newpack.WriteCell(i);
+
+			RequestFrame(Frame_Colors, view_as<any>(newpack));
+		}
+	}
 }
 
 public void Command_SetMsg(int client, const char[] command, const char[] args){
