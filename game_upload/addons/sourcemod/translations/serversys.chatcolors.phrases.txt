@@ -1,0 +1,29 @@
+"Phrases"
+{
+	"Listing colors"
+	{
+		"en"		"Listing colors ..."
+	}
+	"Single color"
+	{
+		"#format" 	"{1:s},{2:s}"
+		"en"		" > {1}{2}"
+	}
+	"Chat settings updated"
+	{
+		"en"		"{GREEN}Chat colors successfully updated!"
+	}
+	"Invalid color specified"
+	{
+		"en"		"{LIGHTRED2}You specified an invalid color!"
+	}
+	"No permissions to use"
+	{
+		"en"		"{LIGHTRED2}You don't have permissions to use custom colors!"
+	}
+
+	"Loaded successfully console"
+	{
+		"en"		"Loaded your chat colors/tag successfully."
+	}
+}

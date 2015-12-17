@@ -36,6 +36,8 @@ public void OnClientPutInServer(int client){
 }
 
 public void OnPluginStart(){
+	LoadTranslations("serversys.chatcolors.phrases");
+
 	if(IsSource2009()){
 		g_iColorCount = 173;
 	}
@@ -89,7 +91,7 @@ public void Colors_Insert(Handle owner, Handle hndl, const char[] error, any use
 		char query[1024];
 		Format(query, sizeof(query), "SELECT tag, msg FROM chatcolors WHERE pid='%d' AND game='%d';", Sys_GetPlayerID(client), view_as<int>(GetEngineVersion()));
 
-		Sys_DB_TQuery(Colors_Loaded, query, userid);
+		Sys_DB_TQuery(Colors_Loaded, query, GetClientUserId(client));
 	}
 }
 
@@ -104,8 +106,8 @@ public void Colors_Loaded(Handle owner, Handle hndl, const char[] error, any use
 	if((0 < client <= MaxClients) && SQL_FetchRow(hndl)){
 		SQL_FetchString(hndl, 0, g_cCustomTag[client], MAX_TAG_LENGTH);
 		SQL_FetchString(hndl, 1, g_cCustomMsg[client], MAX_COLOR_LENGTH);
+		//PrintToConsole(client, "%t", "Loaded successfully console");
 	}
-	PrintToConsole(client, "Loaded your chat colors/tag successfully.");
 }
 
 void UpdateColors(int client){
@@ -135,6 +137,8 @@ public void Command_Colors(int client, const char[] command, const char[] args){
 	if(!(0 < client <= MaxClients))
 		return;
 
+	CPrintToChat(client, "%t", "Listing colors");
+
 	DataPack pack = new DataPack();
 	pack.WriteCell(GetClientUserId(client));
 	pack.WriteCell(0);
@@ -153,11 +157,11 @@ public void Frame_Colors(DataPack pack){
 
 		int i = pos;
 		char buffer[32];
-		for(; ((i < g_iColorCount) && (i < (pos + 4))); i++){
+		for(; ((i < g_iColorCount) && (i < (pos + 3))); i++){
 			strcopy(buffer, sizeof(buffer), (IsSource2009() ? c_Source2009[i] : c_Source2013[i]));
-			CFormatColor(buffer, sizeof(buffer), client);
+			CFormatColor(buffer, sizeof(buffer), 0);
 
-			PrintToChat(client, " > %s%s", buffer, (IsSource2009() ? c_Source2009[i] : c_Source2013[i]));
+			PrintToChat(client, "%t", "Single color", buffer, (IsSource2009() ? c_Source2009[i] : c_Source2013[i]));
 		}
 
 		if(i < g_iColorCount){
@@ -177,8 +181,10 @@ public void Command_SetMsg(int client, const char[] command, const char[] args){
 	if(!(0 < client <= MaxClients))
 		return;
 
-	if(!CheckCommandAccess(client, "sm_sys_chatcolors", ADMFLAG_GENERIC))
+	if(!CheckCommandAccess(client, "sm_sys_chatcolors", ADMFLAG_GENERIC)){
+		CPrintToChat(client, "%t", "No permissions to use");
 		return;
+	}
 
 	bool found = false;
 	for(int i = 0; i < g_iColorCount; i++){
@@ -190,11 +196,11 @@ public void Command_SetMsg(int client, const char[] command, const char[] args){
 
 	if(found){
 		strcopy(g_cCustomMsg[client], MAX_COLOR_LENGTH, args);
-		CPrintToChat(client, "Success!");
+		CPrintToChat(client, "%t", "Chat settings updated");
 
 		UpdateColors(client);
 	}else
-		CPrintToChat(client, "You specified an invalid color!");
+		CPrintToChat(client, "%t", "Invalid color specified");
 
 
 	return;
@@ -207,11 +213,13 @@ public void Command_SetTag(int client, const char[] command, const char[] args){
 	if(!(0 < client <= MaxClients))
 		return;
 
-	if(!CheckCommandAccess(client, "sm_sys_chatcolors", ADMFLAG_GENERIC))
+	if(!CheckCommandAccess(client, "sm_sys_chatcolors", ADMFLAG_GENERIC)){
+		CPrintToChat(client, "%t", "No permissions to use");
 		return;
+	}
 
 	strcopy(g_cCustomTag[client], MAX_TAG_LENGTH, args);
-	CPrintToChat(client, "Success!");
+	CPrintToChat(client, "%t", "Chat settings updated");
 	UpdateColors(client);
 
 	return;
@@ -232,13 +240,13 @@ public Action OnChatMessage(int &author, Handle recipients, char[] name, char[] 
 
 	if(strlen(g_cCustomTag[author]) > 0){
 		Format(name_prefix, MAXLENGTH_NAME, "%s", g_cCustomTag[author]);
-		CFormatColor(name_prefix, MAXLENGTH_NAME);
+		CFormatColor(name_prefix, MAXLENGTH_NAME, 0);
 		Format(name, MAXLENGTH_NAME, "%s%s", name_prefix, name);
 	}
 
 	if(strlen(g_cCustomMsg[author]) > 0){
 		Format(msg_prefix, MAXLENGTH_MESSAGE, "%s", g_cCustomMsg[author]);
-		CFormatColor(msg_prefix, MAXLENGTH_MESSAGE);
+		CFormatColor(msg_prefix, MAXLENGTH_MESSAGE, 0);
 		Format(message, MAXLENGTH_MESSAGE, "%s%s", msg_prefix, message);
 	}
 
