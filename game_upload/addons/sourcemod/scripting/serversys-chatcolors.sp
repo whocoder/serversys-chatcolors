@@ -104,8 +104,15 @@ public void Colors_Loaded(Handle owner, Handle hndl, const char[] error, any use
 	int client = GetClientOfUserId(userid);
 
 	if((0 < client <= MaxClients) && SQL_FetchRow(hndl)){
-		SQL_FetchString(hndl, 0, g_cCustomTag[client], MAX_TAG_LENGTH);
-		SQL_FetchString(hndl, 1, g_cCustomMsg[client], MAX_COLOR_LENGTH);
+		char tagbuffer[MAX_TAG_LENGTH];
+		char msgbuffer[MAX_COLOR_LENGTH];
+
+		SQL_FetchString(hndl, 0, tagbuffer, sizeof(tagbuffer));
+		strcopy(g_cCustomTag[client], MAX_TAG_LENGTH, tagbuffer);
+
+		SQL_FetchString(hndl, 1, msgbuffer, sizeof(msgbuffer));
+		strcopy(g_cCustomMsg[client], MAX_COLOR_LENGTH, msgbuffer);
+		
 		//PrintToConsole(client, "%t", "Loaded successfully console");
 	}
 }
