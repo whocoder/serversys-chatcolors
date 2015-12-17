@@ -4,6 +4,9 @@
 #pragma semicolon 1
 #pragma newdecls required
 
+char q_SelectColors[] = "SELECT tag, msg FROM chatcolors WHERE pid=%d AND game=%d;";
+char q_UpdateColors[] = "INSERT INTO chatcolors(pid, game) VALUES(%d, %d) ON DUPLICATE KEY UPDATE tag='%s', msg='%s';";
+
 public Plugin myinfo = {
 	name = "[Server-Sys] Chat Colors",
 	description = "Server-Sys chat colors and tag handler.",
@@ -15,7 +18,7 @@ public Plugin myinfo = {
 int g_iColorCount = 18;
 
 bool g_bEnablePlugin = true;
-bool g_bDatabaseReady = false;
+bool g_bDatabaseReady = true;
 
 char g_cCommand_SetTag[64];
 char g_cCommand_SetMsg[64];
@@ -28,6 +31,11 @@ char g_cCustomTag[MAXPLAYERS+1][MAX_TAG_LENGTH];
 
 public void OnDatabaseLoaded(bool success){
 	g_bDatabaseReady = success;
+}
+
+public void OnClientPutInServer(int client){
+	strcopy(g_cCustomTag[client], MAX_TAG_LENGTH, "");
+	strcopy(g_cCustomMsg[client], MAX_COLOR_LENGTH, "");
 }
 
 public void OnPluginStart(){
@@ -60,12 +68,49 @@ void LoadConfig(){
 public void OnAllPluginsLoaded(){
 	Sys_RegisterChatCommand(g_cCommand_Colors, Command_Colors);
 	Sys_RegisterChatCommand(g_cCommand_SetTag, Command_SetTag);
-	Sys_RegisterChatCommand(g_cCommand_SetMsg, Command_SetMessage);
+	Sys_RegisterChatCommand(g_cCommand_SetMsg, Command_SetMsg);
 }
 
 public void OnPlayerIDLoaded(int client, int playerid){
-	if(g_bEnablePlugin && (playerid != 0) && (0 < client <= MaxClients)){
-		// sql shit
+	if(g_bEnablePlugin && (playerid > -1) && (0 < client <= MaxClients)){
+		char query[1024];
+		Format(query, sizeof(query), "%s", q_SelectColors, playerid, view_as<int>(GetEngineVersion()));
+
+		Sys_DB_TQuery(Colors_Loaded, query, GetClientUserId(client));
+	}
+}
+
+public void Colors_Loaded(Handle owner, Handle hndl, const char[] error, any userid){
+	if(hndl == INVALID_HANDLE){
+		LogError("[serversys] chat-colors :: Error selecting users chat-colors: %s", error);
+		return;
+	}
+
+	int client = GetClientOfUserId(userid);
+
+	if((0 < client <= MaxClients) && SQL_FetchRow(hndl)){
+		SQL_FetchString(hndl, 0, g_cCustomTag[client], MAX_TAG_LENGTH);
+		SQL_FetchString(hndl, 1, g_cCustomMsg[client], MAX_COLOR_LENGTH);
+	}
+}
+
+void UpdateColors(int client){
+	if((0 < client <= MaxClients) && IsClientInGame(client) && g_bDatabaseReady){
+		int pid = Sys_GetPlayerID(client);
+
+		if(pid > -1){
+			char query[1024];
+			Format(query, sizeof(query), "%s", q_UpdateColors, pid, view_as<int>(GetEngineVersion()), g_cCustomTag[client], g_cCustomMsg[client]);
+
+			Sys_DB_TQuery(Generic_Callback, query);
+		}
+	}
+}
+
+public void Generic_Callback(Handle owner, Handle hndl, const char[] error, any userid){
+	if(hndl == INVALID_HANDLE){
+		LogError("[serversys] chat-colors :: Generic SQL callback error: %s", error);
+		return;
 	}
 }
 
@@ -84,11 +129,10 @@ public void Command_Colors(int client, const char[] command, const char[] args){
 		PrintToChat(client, " > %s%s", buffer, (IsSource2009() ? c_Source2009[i] : c_Source2013[i]));
 	}
 
-
 	return;
 }
 
-public void Command_SetTag(int client, const char[] command, const char[] args){
+public void Command_SetMsg(int client, const char[] command, const char[] args){
 	if(!g_bEnablePlugin)
 		return;
 
@@ -109,14 +153,16 @@ public void Command_SetTag(int client, const char[] command, const char[] args){
 	if(found){
 		strcopy(g_cCustomMsg[client], MAX_COLOR_LENGTH, args);
 		CPrintToChat(client, "Success!");
-		// sql shit
-	}
+
+		UpdateColors(client);
+	}else
+		CPrintToChat(client, "You specified an invalid color!");
 
 
 	return;
 }
 
-public void Command_SetMessage(int client, const char[] command, const char[] args){
+public void Command_SetTag(int client, const char[] command, const char[] args){
 	if(!g_bEnablePlugin)
 		return;
 
@@ -128,7 +174,7 @@ public void Command_SetMessage(int client, const char[] command, const char[] ar
 
 	strcopy(g_cCustomTag[client], MAX_TAG_LENGTH, args);
 	CPrintToChat(client, "Success!");
-	// sql shit
+	UpdateColors(client);
 
 	return;
 }
@@ -143,19 +189,19 @@ public Action OnChatMessage(int &author, Handle recipients, char[] name, char[] 
 	if(!CheckCommandAccess(author, "sm_sys_chatcolors", ADMFLAG_GENERIC))
 		return Plugin_Continue;
 
-	char name_prefix[MAX_NAME_LENGTH];
-	char msg_prefix[MAX_MESSAGE_LENGTH];
+	char name_prefix[MAXLENGTH_NAME];
+	char msg_prefix[MAXLENGTH_MESSAGE];
 
 	if(strlen(g_cCustomTag[author]) > 0){
-		FormatEx(name_prefix, MAX_NAME_LENGTH, "%s", g_cCustomTag[author]);
-		CFormatColor(name_prefix, MAX_NAME_LENGTH, author);
-		FormatEx(name, MAX_NAME_LENGTH, "%s%s", name_prefix, name);
+		Format(name_prefix, MAXLENGTH_NAME, "%s", g_cCustomTag[author]);
+		CFormatColor(name_prefix, MAXLENGTH_NAME);
+		Format(name, MAXLENGTH_NAME, "%s%s", name_prefix, name);
 	}
 
 	if(strlen(g_cCustomMsg[author]) > 0){
-		FormatEx(msg_prefix, MAX_MESSAGE_LENGTH, "%s", g_cCustomMsg[author]);
-		CFormatColor(msg_prefix, MAX_MESSAGE_LENGTH, author);
-		FormatEx(message, MAX_MESSAGE_LENGTH, "%s%s", msg_prefix, message);
+		Format(msg_prefix, MAXLENGTH_MESSAGE, "%s", g_cCustomMsg[author]);
+		CFormatColor(msg_prefix, MAXLENGTH_MESSAGE);
+		Format(message, MAXLENGTH_MESSAGE, "%s%s", msg_prefix, message);
 	}
 
 	return Plugin_Changed;
