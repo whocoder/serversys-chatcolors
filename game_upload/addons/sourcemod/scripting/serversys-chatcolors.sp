@@ -30,11 +30,6 @@ public void OnDatabaseLoaded(bool success){
 	g_bDatabaseReady = success;
 }
 
-public void OnClientPutInServer(int client){
-	strcopy(g_cCustomTag[client], MAX_TAG_LENGTH, "");
-	strcopy(g_cCustomMsg[client], MAX_COLOR_LENGTH, "");
-}
-
 public void OnPluginStart(){
 	LoadTranslations("serversys.chatcolors.phrases");
 
@@ -71,37 +66,39 @@ public void OnAllPluginsLoaded(){
 }
 
 public void OnPlayerIDLoaded(int client, int playerid){
+	strcopy(g_cCustomTag[client], MAX_TAG_LENGTH, "");
+	strcopy(g_cCustomMsg[client], MAX_COLOR_LENGTH, "");
+	
 	if(g_bEnablePlugin && (playerid > -1) && (0 < client <= MaxClients)){
 		char query[1024];
 		Format(query, sizeof(query), "INSERT IGNORE INTO chatcolors(pid, game) VALUES(%d, %d);", playerid, view_as<int>(GetEngineVersion()));
 
-		Sys_DB_TQuery(Colors_Insert, query, GetClientUserId(client));
+		Sys_DB_TQuery(Colors_Insert, query, GetClientSerial(client));
 	}
 }
 
-public void Colors_Insert(Handle owner, Handle hndl, const char[] error, any userid){
+public void Colors_Insert(Handle owner, Handle hndl, const char[] error, any serial){
 	if(hndl == INVALID_HANDLE){
 		LogError("[serversys] chat-colors :: Error inserting users chat-colors: %s", error);
 		return;
 	}
 
-	int client = GetClientOfUserId(userid);
+	int client = GetClientFromSerial(serial);
 
 	if((0 < client <= MaxClients)){
 		char query[1024];
 		Format(query, sizeof(query), "SELECT tag, msg FROM chatcolors WHERE pid='%d' AND game='%d';", Sys_GetPlayerID(client), view_as<int>(GetEngineVersion()));
-
-		Sys_DB_TQuery(Colors_Loaded, query, GetClientUserId(client));
+		Sys_DB_TQuery(Colors_Loaded, query, GetClientSerial(client));
 	}
 }
 
-public void Colors_Loaded(Handle owner, Handle hndl, const char[] error, any userid){
+public void Colors_Loaded(Handle owner, Handle hndl, const char[] error, any serial){
 	if(hndl == INVALID_HANDLE){
 		LogError("[serversys] chat-colors :: Error selecting users chat-colors: %s", error);
 		return;
 	}
 
-	int client = GetClientOfUserId(userid);
+	int client = GetClientFromSerial(serial);
 
 	if((0 < client <= MaxClients) && SQL_FetchRow(hndl)){
 		char tagbuffer[MAX_TAG_LENGTH];
@@ -112,7 +109,7 @@ public void Colors_Loaded(Handle owner, Handle hndl, const char[] error, any use
 
 		SQL_FetchString(hndl, 1, msgbuffer, sizeof(msgbuffer));
 		strcopy(g_cCustomMsg[client], MAX_COLOR_LENGTH, msgbuffer);
-		
+
 		//PrintToConsole(client, "%t", "Loaded successfully console");
 	}
 }
